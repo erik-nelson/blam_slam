@@ -193,7 +193,7 @@ void PrismSLAM::ProcessPointCloudMessage(
   mapper_.ApproxNearestNeighbors(*msg_transformed, msg_neighbors.get());
 
   // Localize to the map. Localization will output a pointcloud aligned in the
-  // sensor frame.
+  // base frame.
   localization_.MeasurementUpdate(msg_transformed, msg_neighbors,
                                   msg_base.get());
 
