@@ -46,7 +46,6 @@
 #include <point_cloud_visualizer/PointCloudVisualizer.h>
 #include <pcl_ros/point_cloud.h>
 
-
 class PrismSLAM {
  public:
   typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
