@@ -243,10 +243,12 @@ void PrismSLAM::ProcessPointCloudMessage(
 
 #if 0
     std::vector<unsigned int> closure_keys;
-    if (loop_closure_.FindLoopClosures(pose_key, &closure_keys))
+    if (loop_closure_.FindLoopClosures(pose_key, &closure_keys)) {
       for (const auto& closure_key : closure_keys) {
         ROS_INFO("%s: Closed loop between poses %u and %u.", pose_key,
                  closure_key);
-  }
+      }
+    }
 #endif
+  }
 }
