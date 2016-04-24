@@ -7,9 +7,9 @@ find_package(catkin REQUIRED COMPONENTS
   measurement_synchronizer
   point_cloud_filter
   point_cloud_odometry
+  laser_loop_closure
   point_cloud_localization
   point_cloud_mapper
-  point_cloud_visualizer
   geometry_utils
   parameter_utils
   pcl_ros
@@ -24,9 +24,9 @@ catkin_package(
     measurement_synchronizer
     point_cloud_filter
     point_cloud_odometry
+    laser_loop_closure
     point_cloud_localization
     point_cloud_mapper
-    point_cloud_visualizer
     geometry_utils
     parameter_utils
     pcl_ros
@@ -50,6 +50,12 @@ target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}.cc)
 target_link_libraries(${PROJECT_NAME}_node
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+)
+
+add_executable(${PROJECT_NAME}_offline src/${PROJECT_NAME}_offline.cc)
+target_link_libraries(${PROJECT_NAME}_offline
   ${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )

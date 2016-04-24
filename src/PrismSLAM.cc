@@ -47,7 +47,7 @@ PrismSLAM::PrismSLAM()
 
 PrismSLAM::~PrismSLAM() {}
 
-bool PrismSLAM::Initialize(const ros::NodeHandle& n) {
+bool PrismSLAM::Initialize(const ros::NodeHandle& n, bool from_log) {
   name_ = ros::names::append(n.getNamespace(), "PrismSLAM");
 
   if (!filter_.Initialize(n)) {
@@ -60,20 +60,18 @@ bool PrismSLAM::Initialize(const ros::NodeHandle& n) {
     return false;
   }
 
+  if (!loop_closure_.Initialize(n)) {
+    ROS_ERROR("%s: Failed to initialize laser loop closure.", name_.c_str());
+    return false;
+  }
+
   if (!localization_.Initialize(n)) {
-    ROS_ERROR("%s: Failed to initialize point cloud localization.",
-              name_.c_str());
+    ROS_ERROR("%s: Failed to initialize localization.", name_.c_str());
     return false;
   }
 
   if (!mapper_.Initialize(n)) {
-    ROS_ERROR("%s: Failed to initialize point cloud mapper.", name_.c_str());
-    return false;
-  }
-
-  if (!visualizer_.Initialize(n)) {
-    ROS_ERROR("%s: Failed to initialize point cloud visualizer.",
-              name_.c_str());
+    ROS_ERROR("%s: Failed to initialize mapper.", name_.c_str());
     return false;
   }
 
@@ -82,7 +80,7 @@ bool PrismSLAM::Initialize(const ros::NodeHandle& n) {
     return false;
   }
 
-  if (!RegisterCallbacks(n)) {
+  if (!RegisterCallbacks(n, from_log)) {
     ROS_ERROR("%s: Failed to register callbacks.", name_.c_str());
     return false;
   }
@@ -102,21 +100,42 @@ bool PrismSLAM::LoadParameters(const ros::NodeHandle& n) {
   return true;
 }
 
-bool PrismSLAM::RegisterCallbacks(const ros::NodeHandle& n) {
+bool PrismSLAM::RegisterCallbacks(const ros::NodeHandle& n, bool from_log) {
   // Create a local nodehandle to manage callback subscriptions.
   ros::NodeHandle nl(n);
-
-  // Initialize timer callbacks.
-  estimate_update_timer_ = nl.createTimer(
-      estimate_update_rate_, &PrismSLAM::EstimateTimerCallback, this);
 
   visualization_update_timer_ = nl.createTimer(
       visualization_update_rate_, &PrismSLAM::VisualizationTimerCallback, this);
 
-  // Initialize sensor callbacks.
+  if (from_log)
+    return RegisterLogCallbacks(n);
+  else
+    return RegisterOnlineCallbacks(n);
+}
+
+bool PrismSLAM::RegisterLogCallbacks(const ros::NodeHandle& n) {
+  ROS_INFO("%s: Registering log callbacks.", name_.c_str());
+  return CreatePublishers(n);
+}
+
+bool PrismSLAM::RegisterOnlineCallbacks(const ros::NodeHandle& n) {
+  ROS_INFO("%s: Registering online callbacks.", name_.c_str());
+
+  // Create a local nodehandle to manage callback subscriptions.
+  ros::NodeHandle nl(n);
+
+  estimate_update_timer_ = nl.createTimer(
+      estimate_update_rate_, &PrismSLAM::EstimateTimerCallback, this);
+
   pcld_sub_ = nl.subscribe("pcld", 100, &PrismSLAM::PointCloudCallback, this);
 
-  // Initialize publishers.
+  return CreatePublishers(n);
+}
+
+bool PrismSLAM::CreatePublishers(const ros::NodeHandle& n) {
+  // Create a local nodehandle to manage callback subscriptions.
+  ros::NodeHandle nl(n);
+
   base_frame_pcld_pub_ =
       nl.advertise<PointCloud>("base_frame_point_cloud", 10, false);
 
@@ -161,7 +180,8 @@ void PrismSLAM::EstimateTimerCallback(const ros::TimerEvent& ev) {
 }
 
 void PrismSLAM::VisualizationTimerCallback(const ros::TimerEvent& ev) {
-  visualizer_.PublishIncrementalPointCloud();
+  mapper_.PublishMap();
+  loop_closure_.PublishPoseGraph();
 }
 
 void PrismSLAM::ProcessPointCloudMessage(
@@ -171,8 +191,7 @@ void PrismSLAM::ProcessPointCloudMessage(
   PointCloud::Ptr msg_filtered(new PointCloud);
   filter_.Filter(msg, msg_filtered);
 
-  // Update odometry by performing ICP. If this is the first point cloud, add it
-  // to the map.
+  // Update odometry by performing ICP.
   if (!odometry_.UpdateEstimate(*msg_filtered)) {
     mapper_.InsertPoints(msg_filtered, false, NULL);
     return;
@@ -193,7 +212,7 @@ void PrismSLAM::ProcessPointCloudMessage(
   mapper_.ApproxNearestNeighbors(*msg_transformed, msg_neighbors.get());
 
   // Localize to the map. Localization will output a pointcloud aligned in the
-  // base frame.
+  // sensor frame.
   localization_.MeasurementUpdate(msg_transformed, msg_neighbors,
                                   msg_base.get());
 
@@ -207,6 +226,27 @@ void PrismSLAM::ProcessPointCloudMessage(
     base_frame_pcld_pub_.publish(base_frame_pcld);
   }
 
-  // Visualize the point cloud in the localization frame.
-  visualizer_.InsertPointCloud(*msg_base_incremental);
+  // Add the new pose to the pose graph.
+  unsigned int pose_key;
+  gu::MatrixNxNBase<double, 6> covariance;
+  covariance.Zeros();
+  for (int i = 0; i < 3; ++i)
+    covariance(i, i) = 0.01;
+  for (int i = 3; i < 6; ++i)
+    covariance(i, i) = 0.004;
+
+  // Check for loop closures.
+  if (loop_closure_.AddBetweenFactor(odometry_.GetIncrementalEstimate(),
+                                     covariance, &pose_key)) {
+    if (!loop_closure_.AddKeyScanPair(pose_key, *msg_filtered))
+      return;
+
+#if 0
+    std::vector<unsigned int> closure_keys;
+    if (loop_closure_.FindLoopClosures(pose_key, &closure_keys))
+      for (const auto& closure_key : closure_keys) {
+        ROS_INFO("%s: Closed loop between poses %u and %u.", pose_key,
+                 closure_key);
+  }
+#endif
 }

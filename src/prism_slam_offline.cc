@@ -31,19 +31,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * Please contact the author(s) of this library if you have any questions.
- * Authors: Erik Nelson            ( eanelson@eecs.berkeley.edu )
+ * Author: Erik Nelson            ( eanelson@eecs.berkeley.edu )
  */
 
 #include <ros/ros.h>
-#include <prism_slam/PrismSLAM.h>
+#include <prism_slam/PrismSLAMOffline.h>
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "prism_slam");
   ros::NodeHandle n("~");
 
-  PrismSLAM ps;
-  if (!ps.Initialize(n, false /* online processing */)) {
-    ROS_ERROR("%s: Failed to initialize Prism SLAM.",
+  PrismSLAMOffline pso;
+  if (!pso.Initialize(n)) {
+    ROS_ERROR("%s: Failed to initialize Prism SLAM offline processor.",
               ros::this_node::getName().c_str());
     return EXIT_FAILURE;
   }
