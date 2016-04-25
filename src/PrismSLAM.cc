@@ -205,16 +205,20 @@ void PrismSLAM::ProcessPointCloudMessage(
 
   // Transform the incoming point cloud to the best estimate of the base frame.
   localization_.MotionUpdate(odometry_.GetIncrementalEstimate());
-  localization_.TransformPointsToBaseFrame(*msg_filtered,
-                                           msg_transformed.get());
+  localization_.TransformPointsToFixedFrame(*msg_filtered,
+                                            msg_transformed.get());
 
   // Get approximate nearest neighbors from the map.
   mapper_.ApproxNearestNeighbors(*msg_transformed, msg_neighbors.get());
 
+  // Transform those nearest neighbors back into sensor frame to perform ICP.
+  localization_.TransformPointsToSensorFrame(*msg_neighbors, msg_neighbors.get());
+
   // Localize to the map. Localization will output a pointcloud aligned in the
   // sensor frame.
-  localization_.MeasurementUpdate(msg_transformed, msg_neighbors,
-                                  msg_base.get());
+  localization_.MeasurementUpdate(msg_filtered, msg_neighbors, msg_base.get());
+
+  localization_.TransformPointsToFixedFrame(*msg_base, msg_base.get());
 
   // Insert the base frame point cloud into the map.
   mapper_.InsertPoints(msg_base, true, msg_base_incremental.get());
@@ -236,7 +240,7 @@ void PrismSLAM::ProcessPointCloudMessage(
     covariance(i, i) = 0.004;
 
   // Check for loop closures.
-  if (loop_closure_.AddBetweenFactor(odometry_.GetIncrementalEstimate(),
+  if (loop_closure_.AddBetweenFactor(localization_.GetIncrementalEstimate(),
                                      covariance, &pose_key)) {
     if (!loop_closure_.AddKeyScanPair(pose_key, *msg_filtered))
       return;
