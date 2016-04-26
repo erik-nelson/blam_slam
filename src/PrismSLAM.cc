@@ -201,7 +201,7 @@ void PrismSLAM::ProcessPointCloudMessage(
   PointCloud::Ptr msg_transformed(new PointCloud);
   PointCloud::Ptr msg_neighbors(new PointCloud);
   PointCloud::Ptr msg_base(new PointCloud);
-  PointCloud::Ptr msg_base_incremental(new PointCloud);
+  PointCloud::Ptr msg_fixed(new PointCloud);
 
   // Transform the incoming point cloud to the best estimate of the base frame.
   localization_.MotionUpdate(odometry_.GetIncrementalEstimate());
@@ -218,18 +218,6 @@ void PrismSLAM::ProcessPointCloudMessage(
   // sensor frame.
   localization_.MeasurementUpdate(msg_filtered, msg_neighbors, msg_base.get());
 
-  localization_.TransformPointsToFixedFrame(*msg_base, msg_base.get());
-
-  // Insert the base frame point cloud into the map.
-  mapper_.InsertPoints(msg_base, true, msg_base_incremental.get());
-
-  // Publish the incoming point cloud message from the base frame.
-  if (base_frame_pcld_pub_.getNumSubscribers() != 0) {
-    PointCloud base_frame_pcld = *msg;
-    base_frame_pcld.header.frame_id = base_frame_id_;
-    base_frame_pcld_pub_.publish(base_frame_pcld);
-  }
-
   // Add the new pose to the pose graph.
   unsigned int pose_key;
   gu::MatrixNxNBase<double, 6> covariance;
@@ -242,17 +230,29 @@ void PrismSLAM::ProcessPointCloudMessage(
   // Check for loop closures.
   if (loop_closure_.AddBetweenFactor(localization_.GetIncrementalEstimate(),
                                      covariance, &pose_key)) {
-    if (!loop_closure_.AddKeyScanPair(pose_key, *msg_filtered))
-      return;
+    if (!loop_closure_.AddKeyScanPair(pose_key, *msg_filtered)) return;
 
-#if 0
     std::vector<unsigned int> closure_keys;
     if (loop_closure_.FindLoopClosures(pose_key, &closure_keys)) {
       for (const auto& closure_key : closure_keys) {
-        ROS_INFO("%s: Closed loop between poses %u and %u.", pose_key,
-                 closure_key);
+        ROS_INFO("%s: Closed loop between poses %u and %u.", name_.c_str(),
+                 pose_key, closure_key);
       }
     }
-#endif
+  }
+
+  // Set the incremental transform back to identity to get ready for map
+  // insertion.
+  localization_.MotionUpdate(gu::Transform3::Identity());
+  localization_.TransformPointsToFixedFrame(*msg_filtered, msg_fixed.get());
+
+  // Insert the base frame point cloud into the map.
+  mapper_.InsertPoints(msg_fixed, false, NULL);
+
+  // Publish the incoming point cloud message from the base frame.
+  if (base_frame_pcld_pub_.getNumSubscribers() != 0) {
+    PointCloud base_frame_pcld = *msg;
+    base_frame_pcld.header.frame_id = base_frame_id_;
+    base_frame_pcld_pub_.publish(base_frame_pcld);
   }
 }
