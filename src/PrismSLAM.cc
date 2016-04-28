@@ -37,7 +37,6 @@
 #include <prism_slam/PrismSLAM.h>
 #include <geometry_utils/Transform3.h>
 #include <parameter_utils/ParameterUtils.h>
-#include <pcl_conversions/pcl_conversions.h>
 
 namespace pu = parameter_utils;
 namespace gu = geometry_utils;
@@ -181,19 +180,18 @@ void PrismSLAM::EstimateTimerCallback(const ros::TimerEvent& ev) {
 
 void PrismSLAM::VisualizationTimerCallback(const ros::TimerEvent& ev) {
   mapper_.PublishMap();
-  loop_closure_.PublishPoseGraph();
 }
 
-void PrismSLAM::ProcessPointCloudMessage(
-    const PointCloud::ConstPtr& msg) {
-
+void PrismSLAM::ProcessPointCloudMessage(const PointCloud::ConstPtr& msg) {
   // Filter the incoming point cloud message.
   PointCloud::Ptr msg_filtered(new PointCloud);
   filter_.Filter(msg, msg_filtered);
 
   // Update odometry by performing ICP.
   if (!odometry_.UpdateEstimate(*msg_filtered)) {
-    mapper_.InsertPoints(msg_filtered, false, NULL);
+    // First update ever.
+    PointCloud::Ptr unused(new PointCloud);
+    mapper_.InsertPoints(msg_filtered, unused.get());
     return;
   }
 
@@ -218,6 +216,48 @@ void PrismSLAM::ProcessPointCloudMessage(
   // sensor frame.
   localization_.MeasurementUpdate(msg_filtered, msg_neighbors, msg_base.get());
 
+  // Check for new loop closures.
+  bool new_keyframe;
+  if (HandleLoopClosures(msg, &new_keyframe)) {
+    // We found one - regenerate the 3D map.
+    PointCloud::Ptr regenerated_map(new PointCloud);
+    loop_closure_.GetMaximumLikelihoodPoints(regenerated_map.get());
+
+    mapper_.Reset();
+    PointCloud::Ptr unused(new PointCloud);
+    mapper_.InsertPoints(regenerated_map, unused.get());
+
+    // Also reset the robot's estimated position.
+    localization_.SetIntegratedEstimate(loop_closure_.GetLastPose());
+  } else {
+    // No new loop closures - but was there a new key frame? If so, add new
+    // points to the map.
+    if (new_keyframe) {
+      localization_.MotionUpdate(gu::Transform3::Identity());
+      localization_.TransformPointsToFixedFrame(*msg, msg_fixed.get());
+      PointCloud::Ptr unused(new PointCloud);
+      mapper_.InsertPoints(msg_fixed, unused.get());
+    }
+  }
+
+  // Visualize the pose graph and current loop closure radius.
+  loop_closure_.PublishPoseGraph();
+
+  // Publish the incoming point cloud message from the base frame.
+  if (base_frame_pcld_pub_.getNumSubscribers() != 0) {
+    PointCloud base_frame_pcld = *msg;
+    base_frame_pcld.header.frame_id = base_frame_id_;
+    base_frame_pcld_pub_.publish(base_frame_pcld);
+  }
+}
+
+bool PrismSLAM::HandleLoopClosures(const PointCloud::ConstPtr& scan,
+                                   bool* new_keyframe) {
+  if (new_keyframe == NULL) {
+    ROS_ERROR("%s: Output boolean for new keyframe is null.", name_.c_str());
+    return false;
+  }
+
   // Add the new pose to the pose graph.
   unsigned int pose_key;
   gu::MatrixNxNBase<double, 6> covariance;
@@ -227,32 +267,24 @@ void PrismSLAM::ProcessPointCloudMessage(
   for (int i = 3; i < 6; ++i)
     covariance(i, i) = 0.004;
 
-  // Check for loop closures.
-  if (loop_closure_.AddBetweenFactor(localization_.GetIncrementalEstimate(),
-                                     covariance, &pose_key)) {
-    if (!loop_closure_.AddKeyScanPair(pose_key, *msg_filtered)) return;
+  if (!loop_closure_.AddBetweenFactor(localization_.GetIncrementalEstimate(),
+                                      covariance, &pose_key)) {
+    return false;
+  }
+  *new_keyframe = true;
 
-    std::vector<unsigned int> closure_keys;
-    if (loop_closure_.FindLoopClosures(pose_key, &closure_keys)) {
-      for (const auto& closure_key : closure_keys) {
-        ROS_INFO("%s: Closed loop between poses %u and %u.", name_.c_str(),
-                 pose_key, closure_key);
-      }
-    }
+  if (!loop_closure_.AddKeyScanPair(pose_key, scan)) {
+    return false;
   }
 
-  // Set the incremental transform back to identity to get ready for map
-  // insertion.
-  localization_.MotionUpdate(gu::Transform3::Identity());
-  localization_.TransformPointsToFixedFrame(*msg_filtered, msg_fixed.get());
-
-  // Insert the base frame point cloud into the map.
-  mapper_.InsertPoints(msg_fixed, false, NULL);
-
-  // Publish the incoming point cloud message from the base frame.
-  if (base_frame_pcld_pub_.getNumSubscribers() != 0) {
-    PointCloud base_frame_pcld = *msg;
-    base_frame_pcld.header.frame_id = base_frame_id_;
-    base_frame_pcld_pub_.publish(base_frame_pcld);
+  std::vector<unsigned int> closure_keys;
+  if (!loop_closure_.FindLoopClosures(pose_key, &closure_keys)) {
+    return false;
   }
+
+  for (const auto& closure_key : closure_keys) {
+    ROS_INFO("%s: Closed loop between poses %u and %u.", name_.c_str(),
+             pose_key, closure_key);
+  }
+  return true;
 }

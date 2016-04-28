@@ -248,6 +248,8 @@ class PrismSLAMOffline {
     }
 
     synchronizer_.ClearMessages();
+
+    ROS_INFO("%s: Finished processing bag file.", name_.c_str());
     return true;
   }
 

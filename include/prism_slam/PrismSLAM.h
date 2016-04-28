@@ -76,6 +76,10 @@ class PrismSLAM {
   void EstimateTimerCallback(const ros::TimerEvent& ev);
   void VisualizationTimerCallback(const ros::TimerEvent& ev);
 
+  // Loop closing. Returns true if at least one loop closure was found. Also
+  // output whether or not a new keyframe was added to the pose graph.
+  bool HandleLoopClosures(const PointCloud::ConstPtr& scan, bool* new_keyframe);
+
   // The node's name.
   std::string name_;
 
