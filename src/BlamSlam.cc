@@ -34,20 +34,20 @@
  * Authors: Erik Nelson            ( eanelson@eecs.berkeley.edu )
  */
 
-#include <prism_slam/PrismSLAM.h>
+#include <blam_slam/BlamSlam.h>
 #include <geometry_utils/Transform3.h>
 #include <parameter_utils/ParameterUtils.h>
 
 namespace pu = parameter_utils;
 namespace gu = geometry_utils;
 
-PrismSLAM::PrismSLAM()
+BlamSlam::BlamSlam()
     : estimate_update_rate_(0.0), visualization_update_rate_(0.0) {}
 
-PrismSLAM::~PrismSLAM() {}
+BlamSlam::~BlamSlam() {}
 
-bool PrismSLAM::Initialize(const ros::NodeHandle& n, bool from_log) {
-  name_ = ros::names::append(n.getNamespace(), "PrismSLAM");
+bool BlamSlam::Initialize(const ros::NodeHandle& n, bool from_log) {
+  name_ = ros::names::append(n.getNamespace(), "BlamSlam");
 
   if (!filter_.Initialize(n)) {
     ROS_ERROR("%s: Failed to initialize point cloud filter.", name_.c_str());
@@ -87,7 +87,7 @@ bool PrismSLAM::Initialize(const ros::NodeHandle& n, bool from_log) {
   return true;
 }
 
-bool PrismSLAM::LoadParameters(const ros::NodeHandle& n) {
+bool BlamSlam::LoadParameters(const ros::NodeHandle& n) {
   // Load update rates.
   if (!pu::Get("rate/estimate", estimate_update_rate_)) return false;
   if (!pu::Get("rate/visualization", visualization_update_rate_)) return false;
@@ -99,12 +99,12 @@ bool PrismSLAM::LoadParameters(const ros::NodeHandle& n) {
   return true;
 }
 
-bool PrismSLAM::RegisterCallbacks(const ros::NodeHandle& n, bool from_log) {
+bool BlamSlam::RegisterCallbacks(const ros::NodeHandle& n, bool from_log) {
   // Create a local nodehandle to manage callback subscriptions.
   ros::NodeHandle nl(n);
 
   visualization_update_timer_ = nl.createTimer(
-      visualization_update_rate_, &PrismSLAM::VisualizationTimerCallback, this);
+      visualization_update_rate_, &BlamSlam::VisualizationTimerCallback, this);
 
   if (from_log)
     return RegisterLogCallbacks(n);
@@ -112,26 +112,26 @@ bool PrismSLAM::RegisterCallbacks(const ros::NodeHandle& n, bool from_log) {
     return RegisterOnlineCallbacks(n);
 }
 
-bool PrismSLAM::RegisterLogCallbacks(const ros::NodeHandle& n) {
+bool BlamSlam::RegisterLogCallbacks(const ros::NodeHandle& n) {
   ROS_INFO("%s: Registering log callbacks.", name_.c_str());
   return CreatePublishers(n);
 }
 
-bool PrismSLAM::RegisterOnlineCallbacks(const ros::NodeHandle& n) {
+bool BlamSlam::RegisterOnlineCallbacks(const ros::NodeHandle& n) {
   ROS_INFO("%s: Registering online callbacks.", name_.c_str());
 
   // Create a local nodehandle to manage callback subscriptions.
   ros::NodeHandle nl(n);
 
   estimate_update_timer_ = nl.createTimer(
-      estimate_update_rate_, &PrismSLAM::EstimateTimerCallback, this);
+      estimate_update_rate_, &BlamSlam::EstimateTimerCallback, this);
 
-  pcld_sub_ = nl.subscribe("pcld", 100, &PrismSLAM::PointCloudCallback, this);
+  pcld_sub_ = nl.subscribe("pcld", 100, &BlamSlam::PointCloudCallback, this);
 
   return CreatePublishers(n);
 }
 
-bool PrismSLAM::CreatePublishers(const ros::NodeHandle& n) {
+bool BlamSlam::CreatePublishers(const ros::NodeHandle& n) {
   // Create a local nodehandle to manage callback subscriptions.
   ros::NodeHandle nl(n);
 
@@ -141,12 +141,11 @@ bool PrismSLAM::CreatePublishers(const ros::NodeHandle& n) {
   return true;
 }
 
-void PrismSLAM::PointCloudCallback(
-    const PointCloud::ConstPtr& msg) {
+void BlamSlam::PointCloudCallback(const PointCloud::ConstPtr& msg) {
   synchronizer_.AddPCLPointCloudMessage(msg);
 }
 
-void PrismSLAM::EstimateTimerCallback(const ros::TimerEvent& ev) {
+void BlamSlam::EstimateTimerCallback(const ros::TimerEvent& ev) {
   // Sort all messages accumulated since the last estimate update.
   synchronizer_.SortMessages();
 
@@ -178,11 +177,11 @@ void PrismSLAM::EstimateTimerCallback(const ros::TimerEvent& ev) {
   synchronizer_.ClearMessages();
 }
 
-void PrismSLAM::VisualizationTimerCallback(const ros::TimerEvent& ev) {
+void BlamSlam::VisualizationTimerCallback(const ros::TimerEvent& ev) {
   mapper_.PublishMap();
 }
 
-void PrismSLAM::ProcessPointCloudMessage(const PointCloud::ConstPtr& msg) {
+void BlamSlam::ProcessPointCloudMessage(const PointCloud::ConstPtr& msg) {
   // Filter the incoming point cloud message.
   PointCloud::Ptr msg_filtered(new PointCloud);
   filter_.Filter(msg, msg_filtered);
@@ -251,8 +250,8 @@ void PrismSLAM::ProcessPointCloudMessage(const PointCloud::ConstPtr& msg) {
   }
 }
 
-bool PrismSLAM::HandleLoopClosures(const PointCloud::ConstPtr& scan,
-                                   bool* new_keyframe) {
+bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr& scan,
+                                  bool* new_keyframe) {
   if (new_keyframe == NULL) {
     ROS_ERROR("%s: Output boolean for new keyframe is null.", name_.c_str());
     return false;

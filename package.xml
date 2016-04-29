@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>prism_slam</name>
+  <name>blam_slam</name>
   <version>0.0.0</version>
-  <description>The prism_slam package</description>
+  <description>The blam_slam package</description>
 
   <author email="eanelson@eecs.berkeley.edu">Erik Nelson</author>
   <maintainer email="eanelson@eecs.berkeley.edu">Erik Nelson</maintainer>

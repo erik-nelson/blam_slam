@@ -43,8 +43,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef PRISM_SLAM_OFFLINE_H
-#define PRISM_SLAM_OFFLINE_H
+#ifndef BLAM_SLAM_OFFLINE_H
+#define BLAM_SLAM_OFFLINE_H
 
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
@@ -55,20 +55,20 @@
 #include <measurement_synchronizer/MeasurementSynchronizer.h>
 #include <rosgraph_msgs/Clock.h>
 
-#include "PrismSLAM.h"
+#include "BlamSlam.h"
 
 namespace pu = parameter_utils;
 
-class PrismSLAMOffline {
+class BlamSlamOffline {
  public:
-  PrismSLAMOffline() {}
-  ~PrismSLAMOffline() {}
+  BlamSlamOffline() {}
+  ~BlamSlamOffline() {}
 
   bool Initialize(const ros::NodeHandle& n) {
-    name_ = ros::names::append(n.getNamespace(), "PrismSLAMOffline");
+    name_ = ros::names::append(n.getNamespace(), "BlamSlamOffline");
 
     if (!slam_.Initialize(n, true)) {
-      ROS_ERROR("%s: Failed to initialize Prism SLAM.", name_.c_str());
+      ROS_ERROR("%s: Failed to initialize BLAM SLAM.", name_.c_str());
       return false;
     }
 
@@ -101,7 +101,7 @@ class PrismSLAMOffline {
     ros::NodeHandle nl;
     const std::string ns = ros::this_node::getNamespace();
 
-    scan_pub_ = nl.advertise<PrismSLAM::PointCloud>(scan_topic_, 10, false);
+    scan_pub_ = nl.advertise<BlamSlam::PointCloud>(scan_topic_, 10, false);
     clock_pub_ = nl.advertise<rosgraph_msgs::Clock>("/clock", 10, false);
 
     return true;
@@ -175,8 +175,8 @@ class PrismSLAMOffline {
 
     BOOST_FOREACH(rosbag::MessageInstance const m, view) {
       if (!m.getTopic().compare(scan_topic_)) {
-        PrismSLAM::PointCloud::ConstPtr msg =
-            m.instantiate<PrismSLAM::PointCloud>();
+        BlamSlam::PointCloud::ConstPtr msg =
+            m.instantiate<BlamSlam::PointCloud>();
 
         if (msg != NULL)
           synchronizer_.AddPCLPointCloudMessage(msg);
@@ -206,7 +206,7 @@ class PrismSLAMOffline {
       switch (type) {
         case MeasurementSynchronizer::PCL_POINTCLOUD: {
           const MeasurementSynchronizer::Message<
-              PrismSLAM::PointCloud>::ConstPtr& m =
+              BlamSlam::PointCloud>::ConstPtr& m =
               synchronizer_.GetPCLPointCloudMessage(index);
 
           slam_.ProcessPointCloudMessage(m->msg);
@@ -249,7 +249,11 @@ class PrismSLAMOffline {
 
     synchronizer_.ClearMessages();
 
-    ROS_INFO("%s: Finished processing bag file.", name_.c_str());
+    const double total_wall_time =
+        (ros::WallTime::now() - wall_time_start).toSec();
+    const double total_bag_time = (bag_time - bag_time_start).toSec();
+    ROS_INFO("%s: Finished processing bag file, %lf percent of real-time.",
+             name_.c_str(), (total_bag_time / total_wall_time) * 100.f);
     return true;
   }
 
@@ -263,7 +267,7 @@ class PrismSLAMOffline {
   double time_scale_;
 
   MeasurementSynchronizer synchronizer_;
-  PrismSLAM slam_;
+  BlamSlam slam_;
 
   ros::Publisher scan_pub_;
   ros::Publisher clock_pub_;

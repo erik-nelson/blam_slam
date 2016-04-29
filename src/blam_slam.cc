@@ -35,15 +35,15 @@
  */
 
 #include <ros/ros.h>
-#include <prism_slam/PrismSLAM.h>
+#include <blam_slam/BlamSlam.h>
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "prism_slam");
+  ros::init(argc, argv, "blam_slam");
   ros::NodeHandle n("~");
 
-  PrismSLAM ps;
-  if (!ps.Initialize(n, false /* online processing */)) {
-    ROS_ERROR("%s: Failed to initialize Prism SLAM.",
+  BlamSlam bs;
+  if (!bs.Initialize(n, false /* online processing */)) {
+    ROS_ERROR("%s: Failed to initialize BLAM SLAM.",
               ros::this_node::getName().c_str());
     return EXIT_FAILURE;
   }

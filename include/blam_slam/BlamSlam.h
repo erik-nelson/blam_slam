@@ -34,8 +34,8 @@
  * Authors: Erik Nelson            ( eanelson@eecs.berkeley.edu )
  */
 
-#ifndef PRISM_SLAM_H
-#define PRISM_SLAM_H
+#ifndef BLAM_SLAM_H
+#define BLAM_SLAM_H
 
 #include <ros/ros.h>
 #include <measurement_synchronizer/MeasurementSynchronizer.h>
@@ -46,12 +46,12 @@
 #include <point_cloud_mapper/PointCloudMapper.h>
 #include <pcl_ros/point_cloud.h>
 
-class PrismSLAM {
+class BlamSlam {
  public:
   typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
-  PrismSLAM();
-  ~PrismSLAM();
+  BlamSlam();
+  ~BlamSlam();
 
   // Calls LoadParameters and RegisterCallbacks. Fails on failure of either.
   // The from_log argument specifies whether to run SLAM online (subscribe to
@@ -99,7 +99,7 @@ class PrismSLAM {
   std::string fixed_frame_id_;
   std::string base_frame_id_;
 
-  // Class objects (PrismSLAM is a composite class).
+  // Class objects (BlamSlam is a composite class).
   MeasurementSynchronizer synchronizer_;
   PointCloudFilter filter_;
   PointCloudOdometry odometry_;

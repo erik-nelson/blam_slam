@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(prism_slam)
+project(blam_slam)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -45,7 +45,7 @@ endif()
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 link_directories(${catkin_LIBRARY_DIRS})
-add_library(${PROJECT_NAME} src/PrismSLAM.cc)
+add_library(${PROJECT_NAME} src/BlamSLAM.cc)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}.cc)
