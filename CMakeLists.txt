@@ -45,7 +45,7 @@ endif()
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 link_directories(${catkin_LIBRARY_DIRS})
-add_library(${PROJECT_NAME} src/BlamSLAM.cc)
+add_library(${PROJECT_NAME} src/BlamSlam.cc)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}.cc)
