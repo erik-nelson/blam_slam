@@ -37,6 +37,7 @@
 #include <blam_slam/BlamSlam.h>
 #include <geometry_utils/Transform3.h>
 #include <parameter_utils/ParameterUtils.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 namespace pu = parameter_utils;
 namespace gu = geometry_utils;
@@ -266,8 +267,9 @@ bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr& scan,
   for (int i = 3; i < 6; ++i)
     covariance(i, i) = 0.004;
 
+  const ros::Time stamp = pcl_conversions::fromPCL(scan->header.stamp);
   if (!loop_closure_.AddBetweenFactor(localization_.GetIncrementalEstimate(),
-                                      covariance, &pose_key)) {
+                                      covariance, stamp, &pose_key)) {
     return false;
   }
   *new_keyframe = true;

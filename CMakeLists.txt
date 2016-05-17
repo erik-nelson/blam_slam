@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_utils
   parameter_utils
   pcl_ros
+  pcl_conversions
 )
 
 catkin_package(
@@ -30,6 +31,7 @@ catkin_package(
     geometry_utils
     parameter_utils
     pcl_ros
+    pcl_conversions
 )
 
 include(CheckCXXCompilerFlag)
