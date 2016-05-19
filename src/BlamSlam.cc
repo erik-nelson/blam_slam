@@ -192,6 +192,7 @@ void BlamSlam::ProcessPointCloudMessage(const PointCloud::ConstPtr& msg) {
     // First update ever.
     PointCloud::Ptr unused(new PointCloud);
     mapper_.InsertPoints(msg_filtered, unused.get());
+    loop_closure_.AddKeyScanPair(0, msg);
     return;
   }
 
